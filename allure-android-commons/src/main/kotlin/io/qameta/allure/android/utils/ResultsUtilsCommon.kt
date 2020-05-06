@@ -5,6 +5,7 @@ import io.qameta.allure.android.annotations.*
 import io.qameta.allure.android.model.Label
 import io.qameta.allure.android.model.Link
 import org.junit.runner.Description
+import java.lang.reflect.AnnotatedElement
 import java.math.BigInteger
 import java.security.MessageDigest
 import java.util.Collections.emptyList
@@ -203,7 +204,9 @@ fun getLabels(description: Description): List<Label> {
             getAnnotationsOnClass(description, Tag::class.java).map { createLabel(it) } +
             getAnnotationsOnMethod(description, Tag::class.java).map { createLabel(it) } +
 
-            getAnnotationsOnMethod(description, AllureId::class.java).map { createLabel(it) }
+            getAnnotationsOnMethod(description, AllureId::class.java).map { createLabel(it) } +
+
+            getLabelAnnotations(description).map { (name, value) -> createLabel(name, value) }
 }
 
 fun <T : Annotation> getAnnotationsOnMethod(description: Description, clazz: Class<T>): List<T> {
@@ -212,6 +215,18 @@ fun <T : Annotation> getAnnotationsOnMethod(description: Description, clazz: Cla
 
 fun <T : Annotation> getAnnotationsOnClass(description: Description, clazz: Class<T>): List<T> {
     return listOfNotNull(description.testClass.getAnnotation(clazz))
+}
+
+fun getLabelAnnotations(description: Description): List<Pair<String, String>> {
+    return getLabelAnnotations(description.annotations) +
+        getLabelAnnotations(description.testClass.annotations.toList())
+}
+
+fun getLabelAnnotations(annos: Collection<Annotation>): List<Pair<String, String>> {
+    return annos
+        .map { it to it.javaClass.getAnnotation(LabelAnnotation::class.java) }
+        .filter { (_, labelAnno) -> labelAnno != null }
+        .map { (anno, labelAnno) -> labelAnno.value to anno.value }
 }
 
 @Suppress("UNUSED_PARAMETER")
@@ -231,3 +246,6 @@ fun getHistoryId(description: Description): String {
 fun md5(source: String): ByteArray {
     return MessageDigest.getInstance("md5").digest(source.toByteArray())
 }
+
+private val Annotation.value: String
+    get() = this.javaClass.getDeclaredMethod("value").invoke(this).toString()
